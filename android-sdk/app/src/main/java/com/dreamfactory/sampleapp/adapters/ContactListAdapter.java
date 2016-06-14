@@ -34,7 +34,7 @@ import retrofit2.Response;
 public class ContactListAdapter extends BaseAdapter {
 
     protected BaseActivity activity;
-    public List<ContactRecord> mRecordsList;
+    protected List<ContactRecord> mRecordsList;
 
     protected BitSet mainSet; // track where section headers are in the list view
     protected BitSet compareSet; // declared up here for reuse
@@ -79,7 +79,7 @@ public class ContactListAdapter extends BaseAdapter {
         }
     }
 
-    public class SortByLastName implements Comparator<ContactRecord>{
+    protected class SortByLastName implements Comparator<ContactRecord>{
         @Override
         public int compare(ContactRecord lhs, ContactRecord rhs) {
 
@@ -129,11 +129,10 @@ public class ContactListAdapter extends BaseAdapter {
             ContactRecord record = mRecordsList.get(position - num_headers);
             holder.text.setText(record.getLastName().substring(0, 1).toUpperCase());
             holder.text.setBackgroundColor(activity.getResources().getColor(R.color.contact_list_header));
-        }
-        else {
+        } else {
             rowView.setClickable(false);
             ContactRecord record = mRecordsList.get(position - num_headers);
-            holder.text.setText(record.getFirstName() + " " + record.getLastName());
+            holder.text.setText(record.getFullName());
             holder.text.setBackgroundColor(activity.getResources().getColor(android.R.color.transparent));
         }
 
@@ -176,7 +175,7 @@ public class ContactListAdapter extends BaseAdapter {
         deleteSet.clear();
     }
 
-    public void RemoveAllSelected() {
+    public void removeAllSelected() {
         // remove all contacts selected by the delete adapter
 
         // build it here so it doesn't get rebuilt in all the requests
@@ -206,6 +205,8 @@ public class ContactListAdapter extends BaseAdapter {
                 });
             }
         }
+
+        if(contactIdsToRemove.getResource().size() == 0) return;
 
         final ContactGroupService contactGroupService = DreamFactoryAPI.getInstance().getService(ContactGroupService.class);
 
@@ -245,7 +246,18 @@ public class ContactListAdapter extends BaseAdapter {
                 } else {
                     ErrorMessage e = DreamFactoryAPI.getErrorMessage(response);
 
-                    onFailure(call, e.toException());
+                    // These two errors are fine for delete case
+                    if(e.getError().getCode() == 404L || e.getError().getCode() == 400L) {
+                        activity.logError("Error while removing contact infos.", e.toException());
+
+                        contactInfosRemoved = true;
+
+                        if(contactRemovedFromGroups && contactInfosRemoved) {
+                            removeContacts(contactIdsToRemove);
+                        }
+                    } else {
+                        onFailure(call, e.toException());
+                    }
                 }
             }
 
